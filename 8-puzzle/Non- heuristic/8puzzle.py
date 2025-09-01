@@ -6,7 +6,7 @@ def print_state(state):
     print()
 
 def is_goal(state):
-    return state == "123456780"
+    return state == "123804765"
 
 def get_neighbors(state):
     neighbors = []
@@ -30,25 +30,31 @@ def get_neighbors(state):
 
 def bfs(start_state):
     visited = set()
-    queue = deque([(start_state, [], [])])  # (state, path of states, moves)
-    
+    queue = deque([(start_state, [], [])])  # (current_state, path_of_states, moves_taken)
+
     while queue:
-        state, path, moves = queue.popleft()
-        if state in visited:
+        current_state, path, moves = queue.popleft()
+
+        if current_state in visited:
             continue
-        visited.add(state)
-        if is_goal(state):
-            steps = path + [state]
+        visited.add(current_state)
+
+        if is_goal(current_state):
+            steps = path + [current_state]
+            print("\n🎯 Goal reached!\n")
             for i, step in enumerate(steps):
                 print(f"Step {i}:")
                 print_state(step)
             print("Moves:", " -> ".join(moves))
-            print("Total steps:", len(steps) - 1)
+            print("Total steps to goal:", len(steps) - 1)
+            print("Total unique states visited:", len(visited))
             return
-        for neighbor, move in get_neighbors(state):
+
+        for neighbor, move in get_neighbors(current_state):
             if neighbor not in visited:
-                queue.append((neighbor, path + [state], moves + [move]))
+                queue.append((neighbor, path + [current_state], moves + [move]))
+
     print("No solution found!")
 
-start = "724506831"
+start = "283164705"
 bfs(start)
