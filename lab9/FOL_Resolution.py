@@ -1,113 +1,73 @@
-name = "Sohan R"
-usn = "1BM23CS336"
-
-def negate(clause):
-    if clause.startswith("¬"):
-        return clause[1:]
-    else:
-        return "¬" + clause
-
-def is_complementary(lit1, lit2):
-    return lit1 == negate(lit2) or lit2 == negate(lit1)
-
-def unify(lit1, lit2):
-    subs = {}
-    if "(" in lit1 and "(" in lit2:
-        p1, args1 = lit1.split("(")
-        p2, args2 = lit2.split("(")
-        args1 = args1[:-1].split(",")
-        args2 = args2[:-1].split(",")
-        if p1 != p2 or len(args1) != len(args2):
-            return None
-        for a1, a2 in zip(args1, args2):
-            a1, a2 = a1.strip(), a2.strip()
-            if a1 != a2:
-                if a1.islower():
-                    subs[a1] = a2
-                elif a2.islower():
-                    subs[a2] = a1
-                else:
-                    return None
-    elif lit1 != lit2:
-        return None
-    return subs
-
-def substitute(clause, subs):
-    if not subs:
-        return clause
-    for var, val in subs.items():
-        clause = clause.replace(var, val)
-    return clause
+def negate_literal(lit):
+    return lit[1:] if lit.startswith("~") else "~" + lit
 
 def resolve(ci, cj):
-    ci_literals = ci.split(" ∨ ")
-    cj_literals = cj.split(" ∨ ")
+    ci = set(ci)
+    cj = set(cj)
     resolvents = []
-    for li in ci_literals:
-        for lj in cj_literals:
-            subs = unify(li.replace(" ", ""), negate(lj.replace(" ", "")))
-            if subs is not None or is_complementary(li.strip(), lj.strip()):
-                new_ci = [substitute(x, subs) for x in ci_literals if x != li] if subs else [x for x in ci_literals if x != li]
-                new_cj = [substitute(x, subs) for x in cj_literals if x != lj] if subs else [x for x in cj_literals if x != lj]
-                new_clause = list(set(new_ci + new_cj))
-                if not new_clause:
-                    return ["NIL"]
-                resolvents.append(" ∨ ".join(new_clause))
+
+    for di in ci:
+        ndi = negate_literal(di)
+        if ndi in cj:
+            new_clause = (ci - {di}) | (cj - {ndi})
+            if len(new_clause) == 0:
+                resolvents.append({"res": set(), "pair": (ci, cj)})
+            else:
+                resolvents.append({"res": new_clause, "pair": (ci, cj)})
     return resolvents
 
-def resolution(KB, query):
-    clauses = KB + [negate(query)]
-    derived_from = {}
-    new = set()
-    print("\n==============================")
-    print("   RESOLUTION STEPS")
-    print("==============================")
-    while True:
-        n = len(clauses)
-        pairs = [(clauses[i], clauses[j]) for i in range(n) for j in range(i+1, n)]
-        for (ci, cj) in pairs:
-            resolvents = resolve(ci, cj)
-            for res in resolvents:
-                print(f"{ci} + {cj} ⟹ {res}")
-                derived_from[res] = (ci, cj)
-                if res == "NIL":
-                    print("\nThe query is proven true by refutation.\n")
-                    print("==============================")
-                    print("        RESOLUTION TREE")
-                    print("==============================")
-                    print_tree("NIL", derived_from, level=0)
-                    return True
-                new.add(res)
-        if new.issubset(set(clauses)):
-            print("\nThe query cannot be proven from the KB.")
-            return False
-        for c in new:
-            if c not in clauses:
-                clauses.append(c)
 
-def print_tree(clause, derived_from, level=0):
-    print("   " * level + f"└── {clause}")
-    if clause in derived_from:
-        parents = derived_from[clause]
-        for p in parents:
-            print_tree(p, derived_from, level + 1)
 
-KB = [
-    "¬Food(x) ∨ Likes(John, x)",
-    "Food(Apple)",
-    "Food(Vegetable)",
-    "¬Eats(x, y) ∨ ¬Killed(x) ∨ Food(y)",
-    "Eats(Anil, Peanut)",
-    "¬Killed(Anil)",
-    "¬Alive(x) ∨ ¬Killed(x)",
-    "Killed(x) ∨ Alive(x)"
+clauses = [
+    {"~Food(x)", "Likes(John,x)"},
+    {"~Eats(x,y)", "~Killed(y)", "Food(y)"},
+    {"Eats(Anil,Peanut)"},
+    {"Alive(Anil)"},
+    {"~Alive(z)", "~Killed(z)"},
+    {"~Likes(John,Peanut)"} 
 ]
 
-query = "Likes(John, Peanut)"
+steps = []
 
-resolution(KB, query)
+changed = True
+while changed:
+    changed = False
+    new = []
 
-print("\n------------------------------")
-print(f"Name : {name}")
-print(f"USN  : {usn}")
-print("------------------------------")
+    for i in range(len(clauses)):
+        for j in range(i+1, len(clauses)):
+            ci = clauses[i]
+            cj = clauses[j]
+            resolvents = resolve(ci, cj)
+
+            for r in resolvents:
+                res = r["res"]
+                if res == set(): # NIL Found
+                    steps.append((ci, cj, set()))
+                    print("\n NIL (Contradiction Found)")
+                    print("=> Query Proven TRUE")
+                    changed = False
+                    break
+
+                if res not in clauses and res not in new:
+                    new.append(res)
+                    steps.append((ci, cj, res))
+                    changed = True
+        if changed is False and resolvents and res == set():
+            break
+
+    for c in new:
+        clauses.append(c)
+
+print("\n==============================")
+print("      RESOLUTION STEPS")
+print("==============================")
+for (a, b, c) in steps:
+    if c == set():
+        print(f"{a}  +  {b}  =>  NIL")
+    else:
+        print(f"{a}  +  {b}  =>  {c}")
+
+print("\nRemaining Clauses:")
+for c in clauses:
+    print(c)
